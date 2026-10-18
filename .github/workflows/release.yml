@@ -101,7 +101,7 @@ jobs:
           with tarfile.open(archive, "w:gz") as tar:
               tar.add(stage, arcname="package")
           with tarfile.open(archive, "r:gz") as tar:
-              names = tar.getnames()
+              names = [member.name for member in tar.getmembers() if member.isfile()]
           banned_names = {"session.cpp", "ipc_client.cpp", "ipc_client.hpp", "exports.cpp", "blaze.cpp", "blaze.hpp", "CMakeLists.txt"}
           banned_suffix = (".pdb", ".exp", ".ilk", ".dll", ".so")
           needles = (b"blazium_ecosystem", b"C:\\Users", b"C:/Users/", b"D:\\", b"D:/", b"/Users/")
