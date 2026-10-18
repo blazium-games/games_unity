@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    if: github.ref_name == 'master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get Version with Bioblaze/game-semver-action
+        id: version
+        uses: Bioblaze/game-semver-action@v10
+        with:
+          personal_github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Finalize version
+        id: finalize
+        run: |
+          set -euo pipefail
+          COMPUTED="${{ steps.version.outputs.simple_version }}"
+          BASE="2.0.0"
+          if [ -z "$COMPUTED" ]; then
+            COMPUTED="$BASE"
+          fi
+          CANDIDATE="$(printf '%s\n%s\n' "$COMPUTED" "$BASE" | sort -V | tail -n1)"
+          echo "simple_version=${CANDIDATE}" >> "$GITHUB_OUTPUT"
+          echo "version ${CANDIDATE}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Skip when this version is already released
+        id: skip
+        env:
+          VER: ${{ steps.finalize.outputs.simple_version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "v${VER}" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "v${VER} already exists"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Pack UPM tarball
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          VER: ${{ steps.finalize.outputs.simple_version }}
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          python3 - <<'PY'
+          import json, os, tarfile
+          from pathlib import Path
+
+          ver = os.environ["VER"]
+          root = Path(".").resolve()
+          stage = Path("dist/package")
+          allow_files = {"package.json", "README.md", "LICENSE", "Runtime.meta", "Samples~.meta"}
+          allow_dirs = ("Runtime/", "Samples~/")
+
+          def allowed(rel: str) -> bool:
+              if rel in allow_files:
+                  return True
+              return rel.startswith(allow_dirs)
+
+          for dirpath, dirnames, filenames in os.walk(root):
+              rel_dir = Path(dirpath).resolve().relative_to(root).as_posix()
+              if rel_dir == ".":
+                  rel_dir = ""
+              dirnames[:] = [name for name in dirnames if name in {"Runtime", "Samples~", "Client", "Server"} or (rel_dir == "" and name in {"Runtime", "Samples~"})]
+              for filename in filenames:
+                  src = Path(dirpath) / filename
+                  rel = src.resolve().relative_to(root).as_posix()
+                  if not allowed(rel):
+                      continue
+                  dest = stage / rel
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  dest.write_bytes(src.read_bytes())
+
+          package_path = stage / "package.json"
+          package = json.loads(package_path.read_text(encoding="utf-8"))
+          package["version"] = ver
+          package_path.write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
+
+          archive = Path(f"dist/com.blazium.games-{ver}.tgz")
+          names = []
+          with tarfile.open(archive, "w:gz") as tar:
+              tar.add(stage, arcname="package")
+          with tarfile.open(archive, "r:gz") as tar:
+              names = tar.getnames()
+          banned_names = {"session.cpp", "ipc_client.cpp", "ipc_client.hpp", "exports.cpp", "blaze.cpp", "blaze.hpp", "CMakeLists.txt"}
+          banned_suffix = (".pdb", ".exp", ".ilk", ".dll", ".so")
+          needles = (b"blazium_ecosystem", b"C:\\Users", b"C:/Users/", b"D:\\", b"D:/", b"/Users/")
+          bad = []
+          for name in names:
+              base = name.rsplit("/", 1)[-1]
+              rel = name[len("package/"):] if name.startswith("package/") else name
+              if base in banned_names or name.endswith(banned_suffix):
+                  bad.append(name)
+              if rel and rel not in allow_files and not rel.startswith(allow_dirs):
+                  bad.append(name)
+          blob = archive.read_bytes()
+          for needle in needles:
+              if needle in blob:
+                  bad.append(needle.decode())
+          if bad:
+              print("archive rejected: " + ", ".join(bad))
+              raise SystemExit(1)
+          print("archive ok: " + ", ".join(names))
+          PY
+      - name: Publish
+        if: steps.skip.outputs.skip != 'true'
+        env:
+          VER: ${{ steps.finalize.outputs.simple_version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "v${VER}" \
+            "dist/com.blazium.games-${VER}.tgz" \
+            --title "v${VER}" \
+            --generate-notes

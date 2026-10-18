@@ -1,0 +1,24 @@
+{
+  "name": "com.blazium.games",
+  "version": "2.0.0",
+  "displayName": "Blazium Games",
+  "description": "Thin bindings over the Blazium Games C API. Init, callbacks, user, lobbies, Steam, bugs, ownership, progress, presence, patch notices, items, and dedicated server.",
+  "license": "MIT",
+  "unity": "2021.3",
+  "documentationUrl": "https://docs.blazium.games/docs/engines",
+  "author": {
+    "name": "Blazium"
+  },
+  "samples": [
+    {
+      "displayName": "Client",
+      "description": "Init, read the logged-on user, and shut down.",
+      "path": "Samples~/Client"
+    },
+    {
+      "displayName": "Dedicated server",
+      "description": "Init a dedicated server, log on, and shut down.",
+      "path": "Samples~/Server"
+    }
+  ]
+}
