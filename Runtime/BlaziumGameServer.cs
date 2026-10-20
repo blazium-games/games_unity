@@ -71,17 +71,29 @@ namespace Blazium.Games
 
         public static string UnlockAchievement(string serverKey, string userUid, string slug)
         {
+#if !UNITY_SERVER
+            return "";
+#else
             return BlaziumNative.ServerUnlockAchievement(serverKey, userUid, slug);
+#endif
         }
 
         public static string SetStat(string serverKey, string userUid, string slug, long value)
         {
+#if !UNITY_SERVER
+            return "";
+#else
             return BlaziumNative.ServerSetStat(serverKey, userUid, slug, value);
+#endif
         }
 
         public static string RecordEvent(string serverKey, string userUid, string name)
         {
+#if !UNITY_SERVER
+            return "";
+#else
             return BlaziumNative.ServerRecordEvent(serverKey, userUid, name);
+#endif
         }
 
         public static string Progress(string serverKey, string userUid)
