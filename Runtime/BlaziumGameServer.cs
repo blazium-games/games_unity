@@ -98,7 +98,11 @@ namespace Blazium.Games
 
         public static string Progress(string serverKey, string userUid)
         {
+#if !UNITY_SERVER
+            return "";
+#else
             return BlaziumNative.ServerProgressRead(serverKey, userUid);
+#endif
         }
     }
 }
