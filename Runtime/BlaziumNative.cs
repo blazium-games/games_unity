@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -156,199 +156,220 @@ namespace Blazium.Games
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr BlaziumAPI_ServerProgressRead(byte[] serverKey, byte[] userUid);
 
+        private static bool Live(BlaziumSession.Kind kind)
+        {
+            return BlaziumSession.Current == kind;
+        }
+
         internal static bool UserLoggedOn()
         {
+            if (!Live(BlaziumSession.Kind.Client))
+            {
+                return false;
+            }
             return BlaziumAPI_IBlaziumUser_BLoggedOn() != 0;
         }
 
         internal static string UserUid()
         {
-            return Copy(BlaziumAPI_IBlaziumUser_GetUserUid());
+            if (!Live(BlaziumSession.Kind.Client))
+            {
+                return string.Empty;
+            }
+            return ClientString(() => Copy(BlaziumAPI_IBlaziumUser_GetUserUid()));
         }
 
         internal static string DisplayName()
         {
-            return Copy(BlaziumAPI_IBlaziumUser_GetDisplayName());
+            return ClientString(() => Copy(BlaziumAPI_IBlaziumUser_GetDisplayName()));
         }
 
         internal static string AvatarUrl()
         {
-            return Copy(BlaziumAPI_IBlaziumUser_GetAvatarUrl());
+            return ClientString(() => Copy(BlaziumAPI_IBlaziumUser_GetAvatarUrl()));
         }
 
         internal static string Username()
         {
-            return Copy(BlaziumAPI_IBlaziumUser_GetUsername());
+            return ClientString(() => Copy(BlaziumAPI_IBlaziumUser_GetUsername()));
         }
 
         internal static string GameUid()
         {
-            return Copy(BlaziumAPI_IBlaziumUser_GetGameUid());
+            return ClientString(() => Copy(BlaziumAPI_IBlaziumUser_GetGameUid()));
         }
 
         internal static bool ServerLogOn()
         {
+            if (!Live(BlaziumSession.Kind.Server))
+            {
+                return false;
+            }
             return BlaziumGameServer_LogOn() != 0;
         }
 
         internal static bool ServerLoggedOn()
         {
+            if (!Live(BlaziumSession.Kind.Server))
+            {
+                return false;
+            }
             return BlaziumGameServer_BLoggedOn() != 0;
         }
 
         internal static string ServerId()
         {
-            return Copy(BlaziumGameServer_GetServerId());
+            return ServerString(() => Copy(BlaziumGameServer_GetServerId()));
         }
 
         internal static string CreateLobby(string lobbyType)
         {
-            return Copy(BlaziumAPI_CreateLobby(Utf8(lobbyType)));
+            return ClientString(() => Copy(BlaziumAPI_CreateLobby(Utf8(lobbyType))));
         }
 
         internal static string JoinLobby(string lobbyId)
         {
-            return Copy(BlaziumAPI_JoinLobby(Utf8(lobbyId)));
+            return ClientString(() => Copy(BlaziumAPI_JoinLobby(Utf8(lobbyId))));
         }
 
         internal static string LobbyStatus(string lobbyId)
         {
-            return Copy(BlaziumAPI_LobbyStatus(Utf8(lobbyId)));
+            return ClientString(() => Copy(BlaziumAPI_LobbyStatus(Utf8(lobbyId))));
         }
 
         internal static string FetchIce(string sessionId)
         {
-            return Copy(BlaziumAPI_FetchIce(Utf8(sessionId)));
+            return ClientString(() => Copy(BlaziumAPI_FetchIce(Utf8(sessionId))));
         }
 
         internal static string LobbySeat()
         {
-            return Copy(BlaziumAPI_LobbySeat());
+            return ClientString(() => Copy(BlaziumAPI_LobbySeat()));
         }
 
         internal static string LeaveLobby()
         {
-            return Copy(BlaziumAPI_LeaveLobby());
+            return ClientString(() => Copy(BlaziumAPI_LeaveLobby()));
         }
 
         internal static string SignInWithSteamTicket(string ticket)
         {
-            return Copy(BlaziumAPI_SignInWithSteamTicket(Utf8(ticket)));
+            return ClientString(() => Copy(BlaziumAPI_SignInWithSteamTicket(Utf8(ticket))));
         }
 
         internal static string SteamId()
         {
-            return Copy(BlaziumAPI_GetSteamId());
+            return ClientString(() => Copy(BlaziumAPI_GetSteamId()));
         }
 
         internal static string SteamExpires()
         {
-            return Copy(BlaziumAPI_GetSteamExpires());
+            return ClientString(() => Copy(BlaziumAPI_GetSteamExpires()));
         }
 
         internal static string ReportBug(string message, string clientVersion, string osName, string arch, string logText, string buildId, string screenshotPath)
         {
-            return Copy(BlaziumAPI_ReportInGameBug(Utf8(message), Utf8(clientVersion), Utf8(osName), Utf8(arch), Utf8(logText), Utf8(buildId), Utf8(screenshotPath)));
+            return ClientString(() => Copy(BlaziumAPI_ReportInGameBug(Utf8(message), Utf8(clientVersion), Utf8(osName), Utf8(arch), Utf8(logText), Utf8(buildId), Utf8(screenshotPath))));
         }
 
         internal static string BugNotices()
         {
-            return Copy(BlaziumAPI_BugNotices());
+            return ClientString(() => Copy(BlaziumAPI_BugNotices()));
         }
 
         internal static string AckBugNotices(string uidsJson)
         {
-            return Copy(BlaziumAPI_AckBugNotices(Utf8(uidsJson)));
+            return ClientString(() => Copy(BlaziumAPI_AckBugNotices(Utf8(uidsJson))));
         }
 
         internal static string Ownership(string edition, string listingUid)
         {
-            return Copy(BlaziumAPI_Ownership(Utf8(edition), Utf8(listingUid)));
+            return ClientString(() => Copy(BlaziumAPI_Ownership(Utf8(edition), Utf8(listingUid))));
         }
 
         internal static string UnlockAchievement(string slug)
         {
-            return Copy(BlaziumAPI_UnlockAchievement(Utf8(slug)));
+            return ClientString(() => Copy(BlaziumAPI_UnlockAchievement(Utf8(slug))));
         }
 
         internal static string SetStat(string slug, long value)
         {
-            return Copy(BlaziumAPI_SetStat(Utf8(slug), value));
+            return ClientString(() => Copy(BlaziumAPI_SetStat(Utf8(slug), value)));
         }
 
         internal static string RecordEvent(string name)
         {
-            return Copy(BlaziumAPI_RecordEvent(Utf8(name)));
+            return ClientString(() => Copy(BlaziumAPI_RecordEvent(Utf8(name))));
         }
 
         internal static string RecordStandardEvents(string buildId, string deviceUid)
         {
-            return Copy(BlaziumAPI_RecordStandardEvents(Utf8(buildId), Utf8(deviceUid)));
+            return ClientString(() => Copy(BlaziumAPI_RecordStandardEvents(Utf8(buildId), Utf8(deviceUid))));
         }
 
         internal static string Progress()
         {
-            return Copy(BlaziumAPI_Progress());
+            return ClientString(() => Copy(BlaziumAPI_Progress()));
         }
 
         internal static string SetPresence(string status)
         {
-            return Copy(BlaziumAPI_SetPresence(Utf8(status)));
+            return ClientString(() => Copy(BlaziumAPI_SetPresence(Utf8(status))));
         }
 
         internal static string PatchNotices()
         {
-            return Copy(BlaziumAPI_PatchNotices());
+            return ClientString(() => Copy(BlaziumAPI_PatchNotices()));
         }
 
         internal static string AckPatchNotices(string uidsJson)
         {
-            return Copy(BlaziumAPI_AckPatchNotices(Utf8(uidsJson)));
+            return ClientString(() => Copy(BlaziumAPI_AckPatchNotices(Utf8(uidsJson))));
         }
 
         internal static string TransferItem(string itemIdsJson, long itemdefId, long count, string direction, string requestId)
         {
-            return Copy(BlaziumAPI_TransferItem(Utf8(itemIdsJson), itemdefId, count, Utf8(direction), Utf8(requestId)));
+            return ClientString(() => Copy(BlaziumAPI_TransferItem(Utf8(itemIdsJson), itemdefId, count, Utf8(direction), Utf8(requestId))));
         }
 
         internal static string SocketItem(string parentId, string childId, long index, string requestId)
         {
-            return Copy(BlaziumAPI_SocketItem(Utf8(parentId), Utf8(childId), index, Utf8(requestId)));
+            return ClientString(() => Copy(BlaziumAPI_SocketItem(Utf8(parentId), Utf8(childId), index, Utf8(requestId))));
         }
 
         internal static string UnsocketItem(string childId, string requestId)
         {
-            return Copy(BlaziumAPI_UnsocketItem(Utf8(childId), Utf8(requestId)));
+            return ClientString(() => Copy(BlaziumAPI_UnsocketItem(Utf8(childId), Utf8(requestId))));
         }
 
         internal static string SetItemStats(string itemId, string statsJson, string requestId)
         {
-            return Copy(BlaziumAPI_SetItemStats(Utf8(itemId), Utf8(statsJson), Utf8(requestId)));
+            return ClientString(() => Copy(BlaziumAPI_SetItemStats(Utf8(itemId), Utf8(statsJson), Utf8(requestId))));
         }
 
         internal static string UseItem(string itemId, string requestId)
         {
-            return Copy(BlaziumAPI_UseItem(Utf8(itemId), Utf8(requestId)));
+            return ClientString(() => Copy(BlaziumAPI_UseItem(Utf8(itemId), Utf8(requestId))));
         }
 
         internal static string ServerUnlockAchievement(string serverKey, string userUid, string slug)
         {
-            return Copy(BlaziumGameServer_UnlockAchievement(Utf8(serverKey), Utf8(userUid), Utf8(slug)));
+            return ServerString(() => Copy(BlaziumGameServer_UnlockAchievement(Utf8(serverKey), Utf8(userUid), Utf8(slug))));
         }
 
         internal static string ServerSetStat(string serverKey, string userUid, string slug, long value)
         {
-            return Copy(BlaziumGameServer_SetStat(Utf8(serverKey), Utf8(userUid), Utf8(slug), value));
+            return ServerString(() => Copy(BlaziumGameServer_SetStat(Utf8(serverKey), Utf8(userUid), Utf8(slug), value)));
         }
 
         internal static string ServerRecordEvent(string serverKey, string userUid, string name)
         {
-            return Copy(BlaziumGameServer_RecordEvent(Utf8(serverKey), Utf8(userUid), Utf8(name)));
+            return ServerString(() => Copy(BlaziumGameServer_RecordEvent(Utf8(serverKey), Utf8(userUid), Utf8(name))));
         }
 
         internal static string ServerProgressRead(string serverKey, string userUid)
         {
-            return Copy(BlaziumAPI_ServerProgressRead(Utf8(serverKey), Utf8(userUid)));
+            return ServerString(() => Copy(BlaziumAPI_ServerProgressRead(Utf8(serverKey), Utf8(userUid))));
         }
 
         internal static string DecodeError(byte[] buf)
@@ -369,16 +390,39 @@ namespace Blazium.Games
             return Encoding.UTF8.GetString(buf, 0, len);
         }
 
+        private static string ClientString(Func<string> call)
+        {
+            if (!Live(BlaziumSession.Kind.Client))
+            {
+                return string.Empty;
+            }
+            return call();
+        }
+
+        private static string ServerString(Func<string> call)
+        {
+            if (!Live(BlaziumSession.Kind.Server))
+            {
+                return string.Empty;
+            }
+            return call();
+        }
+
         private static string Copy(IntPtr ptr)
         {
             if (ptr == IntPtr.Zero)
             {
                 return string.Empty;
             }
+            const int maxBytes = 1 << 20;
             int len = 0;
-            while (Marshal.ReadByte(ptr, len) != 0)
+            while (len < maxBytes && Marshal.ReadByte(ptr, len) != 0)
             {
                 len++;
+            }
+            if (len >= maxBytes)
+            {
+                return string.Empty;
             }
             if (len == 0)
             {
