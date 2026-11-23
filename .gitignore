@@ -11,3 +11,8 @@ Library/
 *.exp
 *.ilk
 *.lib
+!Plugins/
+!Plugins/x86_64/
+!Plugins/x86_64/blazium_api64.dll
+!Plugins/x86_64/blazium_api64.lib
+!Plugins/x86_64/libblazium_api.so
