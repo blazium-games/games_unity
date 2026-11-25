@@ -412,8 +412,57 @@ namespace Blazium.Games
             cache.Clear();
         }
 
-        // ---- who the player is ---------------------------------------------------------------------
+        // ---- chat ------------------------------------------------------------------------------------
 
+        // Signs the player in to the Blazium IRC server: asks for a ten minute password (never the session).
+        // It needs a Blazium account with a username; a Steam player with no account has no chat.
+        public IEnumerator GetChatAccess(BlaziumChatAccess reply)
+        {
+            reply.Ok = false;
+            reply.Username = reply.Token = reply.Host = reply.Code = reply.Error = string.Empty;
+            reply.Port = 0;
+            if (session.Length == 0)
+            {
+                reply.Code = "not_logged_on";
+                reply.Error = "sign in before asking for chat access";
+                yield break;
+            }
+            yield return Refresh(false);
+            string used = session;
+            BlaziumSapiResult res = new BlaziumSapiResult();
+            yield return transport.Send(Json("POST", ApiBase.TrimEnd('/') + "/private/irc/token", "{}", used), res);
+            if (res.Status == 401)
+            {
+                if (used == session)
+                {
+                    Drop(BlaziumSignInState.Idle);
+                }
+                reply.Code = "not_logged_on";
+                reply.Error = "the sign-in has ended; sign in again";
+                yield break;
+            }
+            if (res.Status < 200 || res.Status >= 300)
+            {
+                reply.Code = res.Status == 0 ? "service_unavailable" : "http_" + res.Status;
+                reply.Error = res.Status == 0 ? "the chat service could not be reached" : Refusal(res.Body);
+                yield break;
+            }
+            reply.Username = BlaziumJson.Field(res.Body, "username");
+            reply.Token = BlaziumJson.Field(res.Body, "token");
+            reply.Host = BlaziumJson.Field(res.Body, "host");
+            int.TryParse(BlaziumJson.Field(res.Body, "port"), out reply.Port);
+            reply.Tls = BlaziumJson.Field(res.Body, "tls") != "false";
+            reply.WebSocket = BlaziumJson.Field(res.Body, "websocket");
+            reply.Ok = reply.Token.Length > 0 && reply.Host.Length > 0;
+            if (!reply.Ok)
+            {
+                reply.Token = string.Empty;
+                reply.Code = "refused";
+                reply.Error = "the chat service gave an unexpected answer";
+            }
+        }
+
+        // ---- who the player is ---------------------------------------------------------------------
         public IEnumerator LoadProfile()
         {
             if (session.Length == 0)
@@ -619,6 +668,25 @@ namespace Blazium.Games
         }
     }
 
+    // The way into the Blazium IRC server. Token is the password: a secret that works for ten minutes.
+    public sealed class BlaziumChatAccess
+    {
+        public bool Ok;
+        public string Username = string.Empty;
+        public string Token = string.Empty;
+        public string Host = string.Empty;
+        public int Port;
+        public bool Tls = true;
+        public string WebSocket = string.Empty;
+        public string Code = string.Empty;
+        public string Error = string.Empty;
+
+        // Never prints the password.
+        public override string ToString()
+        {
+            return Ok ? "chat as " + Username + " on " + Host + ":" + Port : Code + ": " + Error;
+        }
+    }
     // What a dedicated server or backend learns about a player.
     public sealed class BlaziumPlayerProof
     {

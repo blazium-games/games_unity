@@ -140,6 +140,10 @@ namespace Blazium.Games.Tests
                 string aud = request.Body.Contains("server") ? "server" : (request.Body.Contains("lobby") ? "lobby" : "sapi");
                 result.Body = "{\"data\":{\"token\":\"scoped-" + aud + "-" + TokensIssued + "\",\"expires_in\":900,\"expires_at\":\"2099-01-01T00:00:00Z\"}}";
             }
+            else if (url.Contains("/private/irc/token"))
+            {
+                result.Body = "{\"username\":\"ada\",\"token\":\"irc-secret\",\"host\":\"irc.blazium.online\",\"port\":6697,\"tls\":true,\"websocket\":\"wss://irc.blazium.online/ws\",\"services_nick\":\"Services\"}";
+            }
             else if (url.Contains("/private/logout"))
             {
                 result.Body = "{\"ok\":true}";
@@ -297,11 +301,19 @@ namespace Blazium.Games.Tests
             Check(fake.Refreshes == 1 && afterRenew.Token == "scoped-sapi-3", "renews when due, then asks for a fresh token");
             Check(store.Load() == fake.ValidSession, "renewed session saved");
 
+            // Chat: the ten minute password, never the session.
+            BlaziumChatAccess chat = new BlaziumChatAccess();
+            Program.Run(session.GetChatAccess(chat));
+            Check(chat.Ok && chat.Host == "irc.blazium.online" && chat.Port == 6697 && chat.Tls && chat.Username == "ada", "chat access");
+            Check(chat.Token == "irc-secret" && chat.Token != session.Export() && !chat.ToString().Contains("irc-secret"), "chat password is not the session and is not printed");
+
             // Logout ends it on the service and forgets the copy.
             Program.Run(session.Logout());
             Check(!session.LoggedOn && session.State == BlaziumSignInState.Idle && store.Load().Length == 0, "logged out");
             Check(fake.Count("POST https://api.blazium.online/api/v1/private/logout") == 1, "service told");
             Check(Ask(session, "sapi").Code == "not_logged_on", "no token after logout");
+            Program.Run(session.GetChatAccess(chat));
+            Check(!chat.Ok && chat.Code == "not_logged_on" && chat.Token.Length == 0, "no chat after logout");
 
             // Restore from the store, and an ended saved session is dropped.
             fake.ValidSession = Jwt("u-1", fake.Now, fake.Now + 3600, "saved");
