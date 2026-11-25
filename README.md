@@ -10,6 +10,19 @@ The public `ReportBug` method sends the in-game report. An empty build id and an
 
 The long guide is [Engines](https://docs.blazium.games/docs/engines).
 
+## Scripted API
+
+`BlaziumApi.RequestToken("sapi")` asks the host for a short-lived token for this game only. The package never mints a token and never sees the login token. `BlaziumSapi` calls `https://sapi.blazium.online/v1/{game_uid}/{logic}` with that token, retries a 429 or 503 with the same `Idempotency-Key`, and asks for a fresh token once after a 401. Run it from a coroutine:
+
+```csharp
+var sapi = BlaziumUnitySapi.Create();
+var result = new BlaziumSapiResult();
+yield return sapi.Call("score_submit", "POST", "{\"score\":10}", result);
+if (!result.Success) Debug.Log(result.ErrorKey + ": " + result.Message);
+```
+
+Pass `anonymous: true` for logic marked `auth = anonymous`. A WebGL build asks the play origin's `POST /blazium/token` instead of a host. The audience `lobby` is also available from `RequestToken`. Tokens expire in minutes and are refused for everything else, so never store one. This needs `blazium_api64.dll` / `libblazium_api.so` from SDK 2.1.0 or newer; an older library returns `sdk_too_old`.
+
 ## Platform
 
 - Docs: [docs.blazium.games](https://docs.blazium.games) and the map [llms.txt](https://docs.blazium.games/llms.txt)
