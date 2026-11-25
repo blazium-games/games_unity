@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 import sys
 
-# Keep this list aligned with games_sdk/public/blazium/blazium_api_flat.h (SDK 2.0.0).
+# Keep this list aligned with games_sdk/public/blazium/blazium_api_flat.h (SDK 2.1.0).
 SYMBOLS = [
     "BlaziumAPI_InitFlat",
     "BlaziumAPI_Shutdown",
@@ -26,6 +26,8 @@ SYMBOLS = [
     "BlaziumAPI_FetchIce",
     "BlaziumAPI_LobbySeat",
     "BlaziumAPI_LeaveLobby",
+    "BlaziumAPI_RequestToken",
+    "BlaziumAPI_ForgetTokens",
     "BlaziumAPI_SignInWithSteamTicket",
     "BlaziumAPI_GetSteamId",
     "BlaziumAPI_GetSteamExpires",
@@ -67,6 +69,8 @@ if missing:
 header = Path("../games_sdk/public/blazium/blazium_api_flat.h")
 if header.is_file():
     found = re.findall(r"S_CALLTYPE\s+([A-Za-z0-9_]+)\s*\(", header.read_text(encoding="utf-8"))
+    # The callback setters are for hosts that cannot poll; the Unity package polls with RunCallbacks.
+    found = [name for name in found if name not in ("BlaziumAPI_SetConnectionCallback", "BlaziumAPI_SetUserChangedCallback")]
     if found != SYMBOLS:
         print("flat header exports differ from the contract list")
         print("header: " + ", ".join(found))

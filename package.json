@@ -1,8 +1,8 @@
 {
   "name": "com.blazium.games",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "displayName": "Blazium Games",
-  "description": "Thin bindings over the Blazium Games C API. Init, callbacks, user, lobbies, Steam, bugs, ownership, progress, presence, patch notices, items, and dedicated server.",
+  "description": "Thin bindings over the Blazium Games C API. Init, callbacks, user, lobbies, Steam, bugs, scoped tokens for the Scripted API, ownership, progress, presence, patch notices, items, and dedicated server.",
   "license": "MIT",
   "unity": "2021.3",
   "documentationUrl": "https://docs.blazium.games/docs/engines",

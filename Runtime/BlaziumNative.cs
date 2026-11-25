@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -80,6 +80,12 @@ namespace Blazium.Games
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr BlaziumAPI_LeaveLobby();
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr BlaziumAPI_RequestToken(byte[] audience);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        private static extern void BlaziumAPI_ForgetTokens();
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr BlaziumAPI_SignInWithSteamTicket(byte[] ticket);
@@ -255,6 +261,38 @@ namespace Blazium.Games
         internal static string SignInWithSteamTicket(string ticket)
         {
             return ClientString(() => Copy(BlaziumAPI_SignInWithSteamTicket(Utf8(ticket))));
+        }
+
+        // Asks the host for a short-lived token ("sapi" or "lobby"). A library older than SDK 2.1 has no such export.
+        internal static string RequestToken(string audience)
+        {
+            if (!Live(BlaziumSession.Kind.Client))
+            {
+                return string.Empty;
+            }
+            try
+            {
+                return Copy(BlaziumAPI_RequestToken(Utf8(audience)));
+            }
+            catch (EntryPointNotFoundException)
+            {
+                return "{\"ok\":false,\"code\":\"sdk_too_old\",\"error\":\"the Blazium library is older than SDK 2.1; update blazium_api64.dll or libblazium_api.so\"}";
+            }
+        }
+
+        internal static void ForgetTokens()
+        {
+            if (!Live(BlaziumSession.Kind.Client))
+            {
+                return;
+            }
+            try
+            {
+                BlaziumAPI_ForgetTokens();
+            }
+            catch (EntryPointNotFoundException)
+            {
+            }
         }
 
         internal static string SteamId()
