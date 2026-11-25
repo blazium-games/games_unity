@@ -17,9 +17,9 @@ namespace Blazium.Games
         {
             using (UnityWebRequest web = new UnityWebRequest(request.Url, request.Method))
             {
-                web.timeout = TimeoutSeconds;
+                web.timeout = request.TimeoutSeconds > 0 ? request.TimeoutSeconds : TimeoutSeconds;
                 web.downloadHandler = new DownloadHandlerBuffer();
-                if (request.Method != "GET" && request.Body.Length > 0)
+                if (request.Method != "GET" && request.Method != "DELETE" && request.Body.Length > 0)
                 {
                     web.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(request.Body));
                 }
@@ -92,6 +92,55 @@ namespace Blazium.Games
         }
     }
 #endif
+
+    // Keeps the session in PlayerPrefs. PlayerPrefs is NOT encrypted (the registry on Windows, a plist
+    // on macOS and iOS, shared preferences on Android). Anyone with the device's files can read it, so
+    // on a phone or console give BlaziumPlayerSession a store backed by the Keychain, the Keystore or
+    // the platform's protected save data instead.
+    public sealed class BlaziumPlayerPrefsStore : IBlaziumSessionStore
+    {
+        private readonly string key;
+
+        public BlaziumPlayerPrefsStore(string gameUid)
+        {
+            key = "blazium.session." + gameUid;
+        }
+
+        public string Load()
+        {
+            return PlayerPrefs.GetString(key, string.Empty);
+        }
+
+        public void Save(string session)
+        {
+            PlayerPrefs.SetString(key, session ?? string.Empty);
+            PlayerPrefs.Save();
+        }
+
+        public void Clear()
+        {
+            PlayerPrefs.DeleteKey(key);
+            PlayerPrefs.Save();
+        }
+    }
+
+    // A ready-made player session: UnityWebRequest for HTTP and PlayerPrefs (or your own store) for
+    // the saved sign-in. No native library and no launcher are needed.
+    public static class BlaziumUnitySignIn
+    {
+        public static BlaziumPlayerSession Create(string gameUid, IBlaziumSessionStore store = null)
+        {
+            return new BlaziumPlayerSession(new BlaziumUnityTransport(), gameUid, store ?? new BlaziumPlayerPrefsStore(gameUid));
+        }
+
+        // The Scripted API client for a signed-in player session.
+        public static BlaziumSapi CreateSapi(BlaziumPlayerSession session)
+        {
+            BlaziumSapi sapi = new BlaziumSapi(new BlaziumUnityTransport(), session);
+            sapi.GameUid = session.GameUid;
+            return sapi;
+        }
+    }
 
     // A ready-made client: BlaziumUnitySapi.Create() uses UnityWebRequest and the right token source for the platform.
     public static class BlaziumUnitySapi

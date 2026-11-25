@@ -23,6 +23,19 @@ if (!result.Success) Debug.Log(result.ErrorKey + ": " + result.Message);
 
 Pass `anonymous: true` for logic marked `auth = anonymous`. A WebGL build asks the play origin's `POST /blazium/token` instead of a host. The audience `lobby` is also available from `RequestToken`. Tokens expire in minutes and are refused for everything else, so never store one. This needs `blazium_api64.dll` / `libblazium_api.so` from SDK 2.1.0 or newer; an older library returns `sdk_too_old`.
 
+## Player sign-in without the launcher (2.2.0)
+
+`BlaziumPlayerSession` signs a player in from any Unity platform with C# only: no `blazium_api64.dll`, no launcher, no `game.blaze`. It shows a link, a QR code, or a short code, waits for the player to finish on blazium.games, renews the session, and returns scoped tokens for `sapi`, `lobby` and `server`, plus chat access for the Blazium IRC server. A returning player is restored from the store.
+
+```csharp
+var session = BlaziumUnitySignIn.Create("<game_uid>");
+yield return session.Restore();
+if (!session.LoggedOn) yield return session.SignIn();      // show session.LoginUrl / UserCode while State == Waiting
+var sapi = BlaziumUnitySignIn.CreateSapi(session);          // BlaziumSapi that uses the session
+```
+
+The default store is `PlayerPrefs`, which is **not encrypted**. On a phone or console implement `IBlaziumSessionStore` over the Keychain, the Keystore or protected save data. The `Player sign-in` sample (Package Manager, Samples) shows the full flow. The runtime is netstandard2.0; the logic is covered by `tests/SapiTests` (run with `dotnet run`), the Unity-only parts compile only inside Unity and were not run in an editor here. When a native library is present `BlaziumSapi` still prefers it, so a game that runs both in and out of the launcher needs no change.
+
 ## Platform
 
 - Docs: [docs.blazium.games](https://docs.blazium.games) and the map [llms.txt](https://docs.blazium.games/llms.txt)

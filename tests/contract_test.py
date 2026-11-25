@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 import sys
 
-# Keep this list aligned with games_sdk/public/blazium/blazium_api_flat.h (SDK 2.1.0).
+# Keep this list aligned with games_sdk/public/blazium/blazium_api_flat.h (SDK 2.2.0).
 SYMBOLS = [
     "BlaziumAPI_InitFlat",
     "BlaziumAPI_Shutdown",
@@ -28,6 +28,13 @@ SYMBOLS = [
     "BlaziumAPI_LeaveLobby",
     "BlaziumAPI_RequestToken",
     "BlaziumAPI_ForgetTokens",
+    "BlaziumAPI_StartLogin",
+    "BlaziumAPI_LoginState",
+    "BlaziumAPI_CancelLogin",
+    "BlaziumAPI_Logout",
+    "BlaziumAPI_ExportSession",
+    "BlaziumAPI_RestoreSession",
+    "BlaziumGameServer_VerifyPlayer",
     "BlaziumAPI_SignInWithSteamTicket",
     "BlaziumAPI_GetSteamId",
     "BlaziumAPI_GetSteamExpires",

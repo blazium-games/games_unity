@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Blazium.Games;
@@ -80,7 +80,7 @@ namespace Blazium.Games.Tests
     {
         private static int failures;
 
-        private static void Check(bool ok, string what)
+        internal static void Check(bool ok, string what)
         {
             if (!ok)
             {
@@ -89,7 +89,7 @@ namespace Blazium.Games.Tests
             }
         }
 
-        private static void Run(IEnumerator routine)
+        internal static void Run(IEnumerator routine)
         {
             Stack<IEnumerator> stack = new Stack<IEnumerator>();
             stack.Push(routine);
@@ -206,6 +206,8 @@ namespace Blazium.Games.Tests
             Check(!no.Ok && no.Token.Length == 0 && no.Code == "feature_off", "parse refusal");
             Check(!BlaziumTokenReply.Parse("").Ok && BlaziumTokenReply.Parse("").Code == "no_host", "empty reply");
             Check(!BlaziumTokenReply.Parse("{\"ok\":true}").Ok, "ok without a token is not ok");
+
+            PlayerSessionTests.Run();
 
             if (failures > 0)
             {

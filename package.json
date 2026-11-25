@@ -1,8 +1,8 @@
 {
   "name": "com.blazium.games",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "displayName": "Blazium Games",
-  "description": "Thin bindings over the Blazium Games C API. Init, callbacks, user, lobbies, Steam, bugs, scoped tokens for the Scripted API, ownership, progress, presence, patch notices, items, and dedicated server.",
+  "description": "Thin bindings over the Blazium Games C API. Init, callbacks, user, lobbies, Steam, bugs, scoped tokens for the Scripted API, launcher-less player sign-in (no native library), ownership, progress, presence, patch notices, items, and dedicated server.",
   "license": "MIT",
   "unity": "2021.3",
   "documentationUrl": "https://docs.blazium.games/docs/engines",
@@ -14,6 +14,11 @@
       "displayName": "Client",
       "description": "Init, read the logged-on user, and shut down.",
       "path": "Samples~/Client"
+    },
+    {
+      "displayName": "Player sign-in",
+      "description": "Sign a player in with no launcher: link, code, restore, renewal, and a Scripted API call.",
+      "path": "Samples~/PlayerSignIn"
     },
     {
       "displayName": "Dedicated server",
