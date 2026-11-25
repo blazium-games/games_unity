@@ -11,6 +11,8 @@ namespace Blazium.Games
         public string Method = "POST";
         public string Url = string.Empty;
         public string Body = string.Empty;
+        // Seconds to wait for an answer. 0 uses the transport's own limit.
+        public int TimeoutSeconds;
         public readonly Dictionary<string, string> Headers = new Dictionary<string, string>();
     }
 

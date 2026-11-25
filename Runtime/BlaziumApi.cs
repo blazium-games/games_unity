@@ -63,5 +63,49 @@ namespace Blazium.Games
         {
             BlaziumNative.ForgetTokens();
         }
+
+        // ---- Sign-in without a launcher, through the native library --------------------------------
+        // For a game whose game.blaze says "mode": "standalone" (SDK 2.2). Init succeeds with nobody
+        // signed in. Call StartLogin, then poll LoginState: it carries state, login_url, user_code,
+        // verification_url, gate and error. Show login_url as a link or QR code, or the short code on a
+        // console. A game that cannot ship the native library signs in with BlaziumPlayerSession instead.
+        public static string StartLogin()
+        {
+            return BlaziumNative.StartLogin();
+        }
+
+        public static string LoginState()
+        {
+            return BlaziumNative.LoginState();
+        }
+
+        public static string CancelLogin()
+        {
+            return BlaziumNative.CancelLogin();
+        }
+
+        // Ends the session and forgets any saved copy.
+        public static string Logout()
+        {
+            return BlaziumNative.Logout();
+        }
+
+        // The session token, for a platform secure store. Treat it as a password.
+        public static string ExportSession()
+        {
+            return BlaziumNative.ExportSession();
+        }
+
+        public static string RestoreSession(string token)
+        {
+            return BlaziumNative.RestoreSession(token);
+        }
+
+        // A dedicated server or backend asks who a player is, from the "server" token the player's game
+        // sent it. Needs the game's server key. Returns {"ok":true,"user_uid":"..."} or {"ok":false,...}.
+        public static string VerifyPlayer(string serverKey, string playerToken)
+        {
+            return BlaziumNative.VerifyPlayer(serverKey, playerToken);
+        }
     }
 }

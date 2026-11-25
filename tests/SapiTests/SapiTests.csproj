@@ -11,5 +11,6 @@
   <ItemGroup>
     <Compile Include="..\..\Runtime\*.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="PlayerSessionTests.cs" />
   </ItemGroup>
 </Project>

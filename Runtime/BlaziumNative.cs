@@ -88,6 +88,27 @@ namespace Blazium.Games
         private static extern void BlaziumAPI_ForgetTokens();
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr BlaziumAPI_StartLogin();
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr BlaziumAPI_LoginState();
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr BlaziumAPI_CancelLogin();
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr BlaziumAPI_Logout();
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr BlaziumAPI_ExportSession();
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr BlaziumAPI_RestoreSession(byte[] token);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr BlaziumGameServer_VerifyPlayer(byte[] serverKey, byte[] token);
+
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr BlaziumAPI_SignInWithSteamTicket(byte[] ticket);
 
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
@@ -292,6 +313,57 @@ namespace Blazium.Games
             }
             catch (EntryPointNotFoundException)
             {
+            }
+        }
+
+        private const string SdkTooOld = "{\"ok\":false,\"code\":\"sdk_too_old\",\"error\":\"the Blazium library is older than SDK 2.2; update blazium_api64.dll or libblazium_api.so\"}";
+
+        // Sign-in without a launcher: the library runs it when game.blaze says "mode": "standalone".
+        internal static string StartLogin()
+        {
+            return Live(BlaziumSession.Kind.Client) ? Guarded(delegate { return Copy(BlaziumAPI_StartLogin()); }) : string.Empty;
+        }
+
+        internal static string LoginState()
+        {
+            return Live(BlaziumSession.Kind.Client) ? Guarded(delegate { return Copy(BlaziumAPI_LoginState()); }) : string.Empty;
+        }
+
+        internal static string CancelLogin()
+        {
+            return Live(BlaziumSession.Kind.Client) ? Guarded(delegate { return Copy(BlaziumAPI_CancelLogin()); }) : string.Empty;
+        }
+
+        internal static string Logout()
+        {
+            return Live(BlaziumSession.Kind.Client) ? Guarded(delegate { return Copy(BlaziumAPI_Logout()); }) : string.Empty;
+        }
+
+        internal static string ExportSession()
+        {
+            return Live(BlaziumSession.Kind.Client) ? Guarded(delegate { return Copy(BlaziumAPI_ExportSession()); }) : string.Empty;
+        }
+
+        internal static string RestoreSession(string token)
+        {
+            return Live(BlaziumSession.Kind.Client) ? Guarded(delegate { return Copy(BlaziumAPI_RestoreSession(Utf8(token))); }) : string.Empty;
+        }
+
+        // Needs a server key and no host, so it works before (and without) an init.
+        internal static string VerifyPlayer(string serverKey, string token)
+        {
+            return Guarded(delegate { return Copy(BlaziumGameServer_VerifyPlayer(Utf8(serverKey), Utf8(token))); });
+        }
+
+        private static string Guarded(Func<string> call)
+        {
+            try
+            {
+                return call();
+            }
+            catch (EntryPointNotFoundException)
+            {
+                return SdkTooOld;
             }
         }
 
