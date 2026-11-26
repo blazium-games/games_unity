@@ -208,6 +208,7 @@ namespace Blazium.Games.Tests
             Check(!BlaziumTokenReply.Parse("{\"ok\":true}").Ok, "ok without a token is not ok");
 
             PlayerSessionTests.Run();
+            SessionStoreTests.Run();
 
             if (failures > 0)
             {

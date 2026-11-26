@@ -6,11 +6,14 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>$(DefineConstants);UNITY_2021_3_OR_NEWER</DefineConstants>
     <RootNamespace>Blazium.Games.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\Runtime\*.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="PlayerSessionTests.cs" />
+    <Compile Include="UnityEngineStub.cs" />
+    <Compile Include="SessionStoreTests.cs" />
   </ItemGroup>
 </Project>
