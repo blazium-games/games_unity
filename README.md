@@ -34,7 +34,7 @@ if (!session.LoggedOn) yield return session.SignIn();      // show session.Login
 var sapi = BlaziumUnitySignIn.CreateSapi(session);          // BlaziumSapi that uses the session
 ```
 
-The default store is `PlayerPrefs`, which is **not encrypted**. On a phone or console implement `IBlaziumSessionStore` over the Keychain, the Keystore or protected save data. The `Player sign-in` sample (Package Manager, Samples) shows the full flow. The runtime is netstandard2.0; the logic is covered by `tests/SapiTests` (run with `dotnet run`), the Unity-only parts compile only inside Unity and were not run in an editor here. When a native library is present `BlaziumSapi` still prefers it, so a game that runs both in and out of the launcher needs no change.
+The session is never written to `PlayerPrefs` as plain text (`PlayerPrefs` is **not encrypted**). The default store seals it with Windows DPAPI on Windows and keeps it in memory only on other platforms, so the player signs in again on the next run. On a phone or console pass `new BlaziumPlayerPrefsStore(gameUid, protector)` with an `IBlaziumSecretProtector` over the Keystore or the Keychain, or implement `IBlaziumSessionStore` over protected save data. A plain-text session left by 2.2.0 is erased the first time the store is used. The `Player sign-in` sample (Package Manager, Samples) shows the full flow. The runtime is netstandard2.0; the logic is covered by `tests/SapiTests` (run with `dotnet run`), the Unity-only parts compile only inside Unity and were not run in an editor here. When a native library is present `BlaziumSapi` still prefers it, so a game that runs both in and out of the launcher needs no change.
 
 ## Platform
 
