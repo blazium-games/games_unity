@@ -15,29 +15,47 @@ jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
-  release:
+  # Third-party code runs here, with a token that can only read contents.
+  # Its only product is the version string handed to the release job.
+  version:
     needs: ci
+    if: github.ref_name == 'master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      simple_version: ${{ steps.version.outputs.simple_version }}
+    steps:
+      - name: Get Version with Bioblaze/game-semver-action
+        id: version
+        uses: Bioblaze/game-semver-action@ed2e83561fc3b591c6046da0a36722994c659657 # v10
+        with:
+          personal_github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Holds contents write: only first-party actions pinned to a full SHA.
+  release:
+    needs: version
     if: github.ref_name == 'master'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
-      - name: Get Version with Bioblaze/game-semver-action
-        id: version
-        uses: Bioblaze/game-semver-action@v10
-        with:
-          personal_github_token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
       - name: Finalize version
         id: finalize
+        env:
+          COMPUTED: ${{ needs.version.outputs.simple_version }}
         run: |
           set -euo pipefail
-          COMPUTED="${{ steps.version.outputs.simple_version }}"
           BASE="2.0.0"
           if [ -z "$COMPUTED" ]; then
             COMPUTED="$BASE"
+          fi
+          if [[ ! "$COMPUTED" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "refusing version output that is not X.Y.Z" >&2
+            exit 1
           fi
           CANDIDATE="$(printf '%s\n%s\n' "$COMPUTED" "$BASE" | sort -V | tail -n1)"
           echo "simple_version=${CANDIDATE}" >> "$GITHUB_OUTPUT"
