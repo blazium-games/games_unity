@@ -1,6 +1,7 @@
 ﻿#if UNITY_2021_3_OR_NEWER
 using System;
 using System.Collections;
+using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -93,39 +94,199 @@ namespace Blazium.Games
     }
 #endif
 
-    // Keeps the session in PlayerPrefs. PlayerPrefs is NOT encrypted (the registry on Windows, a plist
-    // on macOS and iOS, shared preferences on Android). Anyone with the device's files can read it, so
-    // on a phone or console give BlaziumPlayerSession a store backed by the Keychain, the Keystore or
-    // the platform's protected save data instead.
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+    // Windows DPAPI for the current user: the sealed bytes open only for this Windows account on this
+    // machine, so a copied registry hive or backup is useless elsewhere.
+    public sealed class BlaziumDpapiProtector : IBlaziumSecretProtector
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct DataBlob
+        {
+            public int Size;
+            public IntPtr Data;
+        }
+
+        private const int UiForbidden = 0x1;
+
+        [DllImport("crypt32.dll", SetLastError = true)]
+        private static extern bool CryptProtectData(ref DataBlob dataIn, IntPtr description, ref DataBlob entropy, IntPtr reserved, IntPtr prompt, int flags, ref DataBlob dataOut);
+
+        [DllImport("crypt32.dll", SetLastError = true)]
+        private static extern bool CryptUnprotectData(ref DataBlob dataIn, IntPtr description, ref DataBlob entropy, IntPtr reserved, IntPtr prompt, int flags, ref DataBlob dataOut);
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr LocalFree(IntPtr memory);
+
+        private readonly byte[] entropy;
+
+        public BlaziumDpapiProtector(string purpose)
+        {
+            entropy = Encoding.UTF8.GetBytes(string.IsNullOrEmpty(purpose) ? "blazium.session" : purpose);
+        }
+
+        public byte[] Protect(byte[] plain)
+        {
+            return Run(plain, true);
+        }
+
+        public byte[] Unprotect(byte[] sealedValue)
+        {
+            return Run(sealedValue, false);
+        }
+
+        private byte[] Run(byte[] input, bool protect)
+        {
+            if (input == null || input.Length == 0)
+            {
+                return null;
+            }
+            GCHandle inputHandle = GCHandle.Alloc(input, GCHandleType.Pinned);
+            GCHandle entropyHandle = GCHandle.Alloc(entropy, GCHandleType.Pinned);
+            DataBlob output = new DataBlob();
+            try
+            {
+                DataBlob source = new DataBlob { Size = input.Length, Data = inputHandle.AddrOfPinnedObject() };
+                DataBlob salt = new DataBlob { Size = entropy.Length, Data = entropyHandle.AddrOfPinnedObject() };
+                bool ok = protect
+                    ? CryptProtectData(ref source, IntPtr.Zero, ref salt, IntPtr.Zero, IntPtr.Zero, UiForbidden, ref output)
+                    : CryptUnprotectData(ref source, IntPtr.Zero, ref salt, IntPtr.Zero, IntPtr.Zero, UiForbidden, ref output);
+                if (!ok || output.Data == IntPtr.Zero || output.Size <= 0)
+                {
+                    return null;
+                }
+                byte[] result = new byte[output.Size];
+                Marshal.Copy(output.Data, result, 0, output.Size);
+                return result;
+            }
+            catch (DllNotFoundException)
+            {
+                return null;
+            }
+            catch (EntryPointNotFoundException)
+            {
+                return null;
+            }
+            finally
+            {
+                if (output.Data != IntPtr.Zero)
+                {
+                    Marshal.Copy(new byte[output.Size], 0, output.Data, output.Size);
+                    LocalFree(output.Data);
+                }
+                inputHandle.Free();
+                entropyHandle.Free();
+            }
+        }
+    }
+#endif
+
+    public static class BlaziumSecretProtectors
+    {
+        // The OS secret store for this player, or null when the package has none for the platform.
+        // On a phone or console pass your own (Keystore, Keychain, protected save data).
+        public static IBlaziumSecretProtector ForPlatform(string gameUid)
+        {
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+            return new BlaziumDpapiProtector("blazium.session." + gameUid);
+#else
+            return null;
+#endif
+        }
+    }
+
+    // Keeps the session in PlayerPrefs, sealed by an IBlaziumSecretProtector. PlayerPrefs itself is NOT
+    // encrypted (the registry on Windows, a plist on macOS and iOS, shared preferences on Android), so
+    // the raw session is never written there. With no protector the session stays in memory only and
+    // the player signs in again on the next run. An unsealed entry left by an older version is erased.
     public sealed class BlaziumPlayerPrefsStore : IBlaziumSessionStore
     {
         private readonly string key;
+        private readonly string plainKey;
+        private readonly IBlaziumSecretProtector protector;
 
-        public BlaziumPlayerPrefsStore(string gameUid)
+        public BlaziumPlayerPrefsStore(string gameUid) : this(gameUid, BlaziumSecretProtectors.ForPlatform(gameUid))
         {
-            key = "blazium.session." + gameUid;
         }
+
+        public BlaziumPlayerPrefsStore(string gameUid, IBlaziumSecretProtector protector)
+        {
+            key = "blazium.session.sealed." + gameUid;
+            plainKey = "blazium.session." + gameUid;
+            this.protector = protector;
+        }
+
+        // False when nothing is kept between runs on this platform.
+        public bool Persists { get { return protector != null; } }
 
         public string Load()
         {
-            return PlayerPrefs.GetString(key, string.Empty);
+            string legacy = PlayerPrefs.GetString(plainKey, string.Empty);
+            if (legacy.Length > 0)
+            {
+                Save(legacy);
+                return legacy;
+            }
+            if (protector == null)
+            {
+                return string.Empty;
+            }
+            string stored = PlayerPrefs.GetString(key, string.Empty);
+            if (stored.Length == 0)
+            {
+                return string.Empty;
+            }
+            byte[] opened = null;
+            try
+            {
+                opened = protector.Unprotect(Convert.FromBase64String(stored));
+            }
+            catch (Exception)
+            {
+            }
+            if (opened == null || opened.Length == 0)
+            {
+                Clear();
+                return string.Empty;
+            }
+            return Encoding.UTF8.GetString(opened);
         }
 
         public void Save(string session)
         {
-            PlayerPrefs.SetString(key, session ?? string.Empty);
+            PlayerPrefs.DeleteKey(plainKey);
+            byte[] sealedValue = null;
+            if (protector != null && !string.IsNullOrEmpty(session))
+            {
+                try
+                {
+                    sealedValue = protector.Protect(Encoding.UTF8.GetBytes(session));
+                }
+                catch (Exception)
+                {
+                    sealedValue = null;
+                }
+            }
+            if (sealedValue == null || sealedValue.Length == 0)
+            {
+                PlayerPrefs.DeleteKey(key);
+            }
+            else
+            {
+                PlayerPrefs.SetString(key, Convert.ToBase64String(sealedValue));
+            }
             PlayerPrefs.Save();
         }
 
         public void Clear()
         {
+            PlayerPrefs.DeleteKey(plainKey);
             PlayerPrefs.DeleteKey(key);
             PlayerPrefs.Save();
         }
     }
 
-    // A ready-made player session: UnityWebRequest for HTTP and PlayerPrefs (or your own store) for
-    // the saved sign-in. No native library and no launcher are needed.
+    // A ready-made player session: UnityWebRequest for HTTP and a sealed PlayerPrefs store (or your own
+    // store) for the saved sign-in. No native library and no launcher are needed.
     public static class BlaziumUnitySignIn
     {
         public static BlaziumPlayerSession Create(string gameUid, IBlaziumSessionStore store = null)
