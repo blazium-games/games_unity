@@ -27,6 +27,15 @@ namespace Blazium.Games
         void Clear();
     }
 
+    // Seals the saved session with the platform's secret store (DPAPI, the Keystore, the Keychain) so
+    // only this player on this device can open it. Return null when the value could not be sealed or
+    // opened; nothing is written then.
+    public interface IBlaziumSecretProtector
+    {
+        byte[] Protect(byte[] plain);
+        byte[] Unprotect(byte[] sealedValue);
+    }
+
     public sealed class BlaziumMemorySessionStore : IBlaziumSessionStore
     {
         private string held = string.Empty;

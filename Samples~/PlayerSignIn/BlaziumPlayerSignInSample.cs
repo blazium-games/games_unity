@@ -14,9 +14,12 @@ namespace Blazium.Games.Samples
 
         private void Start()
         {
+            // The default store seals the session with DPAPI on Windows and keeps it in memory only
+            // elsewhere. On a phone or console pass new BlaziumPlayerPrefsStore(GameUid, protector)
+            // with a protector over the Keystore or the Keychain to keep the sign-in between runs.
             session = BlaziumUnitySignIn.Create(GameUid);
             session.Changed += OnChanged;
-            // A returning player is signed in again with no steps.
+            // A returning player whose sealed session was kept is signed in again with no steps.
             StartCoroutine(Begin());
         }
 
