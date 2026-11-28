@@ -210,7 +210,7 @@ namespace Blazium.Games.Tests
             {
                 return Convert.ToBase64String(Encoding.UTF8.GetBytes(s)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
             };
-            return b64("{\"alg\":\"none\"}") + "." + b64("{\"user_uid\":\"" + user + "\",\"iat\":" + iat + ",\"exp\":" + exp + ",\"tag\":\"" + tag + "\"}") + "." + b64("sig");
+            return b64("{\"alg\":\"HS256\",\"typ\":\"JWT\"}") + "." + b64("{\"user_uid\":\"" + user + "\",\"iat\":" + iat + ",\"exp\":" + exp + ",\"tag\":\"" + tag + "\"}") + "." + b64("sig");
         }
 
         private static void Check(bool ok, string what)
