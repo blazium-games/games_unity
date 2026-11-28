@@ -27,6 +27,8 @@ Pass `anonymous: true` for logic marked `auth = anonymous`. A WebGL build asks t
 
 `BlaziumPlayerSession` signs a player in from any Unity platform with C# only: no `blazium_api64.dll`, no launcher, no `game.blaze`. It shows a link, a QR code, or a short code, waits for the player to finish on blazium.games, renews the session, and returns scoped tokens for `sapi`, `lobby` and `server`, plus chat access for the Blazium IRC server. A returning player is restored from the store.
 
+A saved session counts as signed in only after the Blazium service accepts it, so `Restore()` needs the network; offline, the player stays signed out and `Error` says why. A session your game kept somewhere else is restored with `yield return session.Restore(savedSession)`. `Use(savedSession)` cannot wait for the service, so it no longer signs anyone in.
+
 ```csharp
 var session = BlaziumUnitySignIn.Create("<game_uid>");
 yield return session.Restore();

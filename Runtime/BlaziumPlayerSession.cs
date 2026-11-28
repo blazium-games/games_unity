@@ -120,7 +120,8 @@ namespace Blazium.Games
 
         // ---- saved sign-in ---------------------------------------------------------------------------
 
-        // Uses the session a store kept from an earlier run. An ended one is dropped.
+        // Uses the session a store kept from an earlier run, once the Blazium service accepts it. An
+        // ended or refused one is dropped. With no network the player stays signed out and Error says why.
         public IEnumerator Restore()
         {
             string saved = store != null ? store.Load() : string.Empty;
@@ -128,25 +129,29 @@ namespace Blazium.Games
             {
                 yield break;
             }
-            if (!Adopt(saved, string.Empty, false))
-            {
-                store.Clear();
-                yield break;
-            }
-            SetState(BlaziumSignInState.Complete);
-            yield return Refresh(false);
-            yield return LoadProfile();
+            yield return Verify(saved, false);
         }
 
-        // Uses a session the game kept elsewhere. Returns an empty string when it was accepted.
+        // Uses a session the game kept elsewhere, once the Blazium service accepts it, and saves it to
+        // the store. It ends with State Complete, or with Error set and the player not signed in.
+        public IEnumerator Restore(string savedSession)
+        {
+            yield return Verify(savedSession ?? string.Empty, true);
+        }
+
+        // A session is only signed in after the Blazium service accepts it, which Use cannot wait for.
+        // It never signs the player in and always returns why.
+        [Obsolete("Use cannot check a session with the Blazium service. yield return Restore(savedSession) instead.")]
         public string Use(string savedSession)
         {
-            if (!Adopt(savedSession, string.Empty, true))
+            string user;
+            long exp;
+            long iat;
+            if (!ReadClaims(savedSession, out user, out exp, out iat) || exp <= Clock())
             {
-                return "that session is not usable (it has ended or is not a Blazium session)";
+                return Unusable;
             }
-            SetState(BlaziumSignInState.Complete);
-            return string.Empty;
+            return "the session has to be checked with the Blazium service first: yield return Restore(savedSession)";
         }
 
         // The session token, for a platform secure store. Treat it as a password.
@@ -505,6 +510,62 @@ namespace Blazium.Games
 
         // ---- internals -----------------------------------------------------------------------------
 
+        private const string Unusable = "that session is not usable (it has ended or is not a Blazium session)";
+
+        // Signs in with exactly the string the service accepted, and only when the service names the
+        // player the session names (or names nobody). A sign-in or sign-out meanwhile wins.
+        private IEnumerator Verify(string candidate, bool save)
+        {
+            string user;
+            long exp;
+            long iat;
+            if (!ReadClaims(candidate, out user, out exp, out iat) || exp <= Clock())
+            {
+                if (save)
+                {
+                    Error = Unusable;
+                    Notify();
+                }
+                else if (store != null)
+                {
+                    store.Clear();
+                }
+                yield break;
+            }
+            int seen = epoch;
+            BlaziumSapiResult res = new BlaziumSapiResult();
+            yield return transport.Send(Json("GET", ApiBase.TrimEnd('/') + "/private/account", string.Empty, candidate), res);
+            if (seen != epoch)
+            {
+                yield break;
+            }
+            bool ok = res.Status >= 200 && res.Status < 300;
+            string named = ok ? BlaziumJson.Field(res.Body, "user_uid") : string.Empty;
+            if (ok && named.Length == 0)
+            {
+                named = BlaziumJson.Field(res.Body, "uid");
+            }
+            if (!ok || (named.Length > 0 && named != user))
+            {
+                bool refused = ok || res.Status == 401 || res.Status == 403;
+                if (refused && !save && store != null)
+                {
+                    store.Clear();
+                }
+                Error = res.Status == 0 ? "the Blazium service could not be reached to check the session" : "the Blazium service did not accept the session";
+                Notify();
+                yield break;
+            }
+            if (!Adopt(candidate, BlaziumJson.Field(res.Body, "display_name"), save))
+            {
+                yield break;
+            }
+            Username = BlaziumJson.Field(res.Body, "username");
+            Error = string.Empty;
+            SetState(BlaziumSignInState.Complete);
+            yield return Refresh(false);
+        }
+
         private bool RefreshDue(long now)
         {
             if (now >= expires || now < nextRefreshTry)
@@ -637,7 +698,9 @@ namespace Blazium.Games
             return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
 
-        // Learns who a session token is for and when it ends. The service decides whether it is valid.
+        // Learns who a session token is for and when it ends, and turns away tokens that cannot be
+        // signed sessions (alg none, no signature). It does not check the signature: only the service
+        // can, so a session is never signed in until the service accepts it.
         internal static bool ReadClaims(string jwt, out string user, out long exp, out long iat)
         {
             user = string.Empty;
@@ -648,21 +711,23 @@ namespace Blazium.Games
                 return false;
             }
             string[] parts = jwt.Split('.');
-            if (parts.Length != 3)
+            if (parts.Length != 3 || !IsBase64Url(parts[2]))
             {
                 return false;
             }
+            string header;
             string payload;
-            try
+            if (!DecodeSegment(parts[0], out header) || !DecodeSegment(parts[1], out payload))
             {
-                string b64 = parts[1].Replace('-', '+').Replace('_', '/');
-                while (b64.Length % 4 != 0)
-                {
-                    b64 += "=";
-                }
-                payload = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+                return false;
             }
-            catch (FormatException)
+            // A JSON escape or a second alg could hide a different algorithm from Field.
+            if (header.IndexOf('\\') >= 0 || header.IndexOf("\"alg\"", StringComparison.Ordinal) != header.LastIndexOf("\"alg\"", StringComparison.Ordinal))
+            {
+                return false;
+            }
+            string alg = BlaziumJson.Field(header, "alg").Trim();
+            if (alg.Length == 0 || string.Equals(alg, "none", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -674,6 +739,46 @@ namespace Blazium.Games
                 user = BlaziumJson.Field(payload, "uid");
             }
             return exp > 0 && user.Length > 0;
+        }
+
+        private static bool IsBase64Url(string segment)
+        {
+            if (segment.Length == 0)
+            {
+                return false;
+            }
+            foreach (char c in segment)
+            {
+                bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
+                if (!ok)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool DecodeSegment(string segment, out string text)
+        {
+            text = string.Empty;
+            if (!IsBase64Url(segment))
+            {
+                return false;
+            }
+            try
+            {
+                string b64 = segment.Replace('-', '+').Replace('_', '/');
+                while (b64.Length % 4 != 0)
+                {
+                    b64 += "=";
+                }
+                text = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
         }
     }
 
